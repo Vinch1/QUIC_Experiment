@@ -11,8 +11,10 @@ const (
 type Status struct {
 	NodeID        string
 	State         State
-	ListenAddr    string
+	ControlAddr   string
+	RaftAddr      string
 	TransportKind string
+	LeaderID      string
 	PeerCount     int
 	Started       bool
 }

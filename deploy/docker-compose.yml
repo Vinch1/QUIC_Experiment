@@ -3,23 +3,49 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    command: ["--id", "node-1", "--listen", "0.0.0.0:9001", "--transport", "tcp"]
+    command:
+      [
+        "--id", "node-1",
+        "--control-addr", "0.0.0.0:9001",
+        "--raft-addr", "0.0.0.0:7001",
+        "--transport", "tcp",
+        "--leader",
+        "--peers", "node-2=node2:7002,node-3=node3:7003"
+      ]
     ports:
       - "9001:9001"
+      - "7001:7001"
 
   node2:
     build:
       context: ..
       dockerfile: Dockerfile
-    command: ["--id", "node-2", "--listen", "0.0.0.0:9002", "--transport", "tcp"]
+    command:
+      [
+        "--id", "node-2",
+        "--control-addr", "0.0.0.0:9002",
+        "--raft-addr", "0.0.0.0:7002",
+        "--transport", "tcp",
+        "--leader-id", "node-1",
+        "--peers", "node-1=node1:7001,node-3=node3:7003"
+      ]
     ports:
       - "9002:9002"
+      - "7002:7002"
 
   node3:
     build:
       context: ..
       dockerfile: Dockerfile
-    command: ["--id", "node-3", "--listen", "0.0.0.0:9003", "--transport", "tcp"]
+    command:
+      [
+        "--id", "node-3",
+        "--control-addr", "0.0.0.0:9003",
+        "--raft-addr", "0.0.0.0:7003",
+        "--transport", "tcp",
+        "--leader-id", "node-1",
+        "--peers", "node-1=node1:7001,node-2=node2:7002"
+      ]
     ports:
       - "9003:9003"
-
+      - "7003:7003"

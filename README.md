@@ -1,99 +1,73 @@
-# QUIC_Experiment
+# quic-raft
 
-Class project - A proof-of-concept experiment comparing TCP vs QUIC as the transport layer for Raft consensus.
+Proof-of-concept project for comparing `TCP` vs `QUIC` as the inter-node transport layer beneath a Raft-style replication flow.
 
 ## Current Goals
 
-- Build a minimal runnable Raft experiment skeleton
-- Keep the transport layer pluggable for fair TCP/QUIC comparison
-- Support local 3-node experiments first, then extend to weak network and fault injection
-- Complete environment setup, scaffolding, and experiment plan before implementing protocols and algorithms
+- Build a runnable multi-node experiment skeleton
+- Keep `client -> node` and `node -> node` concerns clearly separated
+- Make `node -> node` transport switchable between `TCP` and `QUIC`
+- Validate majority replication behavior locally before implementing full Raft
 
 ## Current Status
 
-This repository provides:
+This repository now provides:
 
 - Go project scaffolding
 - `node` / `client` / `bench` entry points
-- Minimal interface skeletons for Raft, transport layer, storage layer, and state machine
-- HTTP-based minimal control plane with `put` / `get` / `status`
-- Local environment check script
-- Project plan and setup documentation
-- Reserved Docker Compose / Proto / netem directories
+- Real `node -> node` TCP transport
+- Real `node -> node` QUIC transport
+- HTTP control plane with `put` / `get` / `status`
+- Minimal majority replication path with a static leader
 
 Not yet implemented:
 
-- Complete Raft leader election and log replication
-- Actual TCP / QUIC network implementation
-- Protobuf code generation
-- Prometheus metrics collection
-- Automated benchmark executor
-
-## Directory Structure
-
-```text
-.
-├── api/proto
-├── cmd
-│   ├── bench
-│   ├── client
-│   └── node
-├── deploy
-│   ├── docker-compose.yml
-│   └── netem
-├── docs
-├── internal
-│   ├── cluster
-│   ├── metrics
-│   ├── raft
-│   ├── statemachine
-│   ├── storage
-│   └── transport
-├── scripts
-├── Dockerfile
-├── Makefile
-└── go.mod
-```
+- Dynamic Raft leader election
+- Raft term / log index / commit index semantics
+- Protobuf-generated message layer
+- Snapshot / WAL / membership change
+- Benchmark automation and metrics dashboard
 
 ## Quick Start
 
-1. Check local dependencies
+1. Start a 3-node TCP cluster
 
 ```bash
-make doctor
+go run ./cmd/node --id node-1 --control-addr 127.0.0.1:9001 --raft-addr 127.0.0.1:7001 --transport quic --leader --peers node-2=127.0.0.1:7002,node-3=127.0.0.1:7003
+go run ./cmd/node --id node-2 --control-addr 127.0.0.1:9002 --raft-addr 127.0.0.1:7002 --transport quic --leader-id node-1 --peers node-1=127.0.0.1:7001,node-3=127.0.0.1:7003
+go run ./cmd/node --id node-3 --control-addr 127.0.0.1:9003 --raft-addr 127.0.0.1:7003 --transport quic --leader-id node-1 --peers node-1=127.0.0.1:7001,node-2=127.0.0.1:7002
 ```
 
-2. Run node scaffold
+2. Switch to QUIC by changing only the transport flag
 
 ```bash
-make run-node
+go run ./cmd/node --id node-1 --control-addr 127.0.0.1:9001 --raft-addr 127.0.0.1:7001 --transport quic --leader --peers node-2=127.0.0.1:7002,node-3=127.0.0.1:7003
 ```
 
-3. Write a key-value pair
+3. Write through the control plane
 
 ```bash
 make run-client
 ```
 
-4. Read a key-value pair
+4. Read from a node
 
 ```bash
-go run ./cmd/client --addr 127.0.0.1:9001 --command get --key demo
+go run ./cmd/client --addr 127.0.0.1:9002 --command get --key demo
 ```
 
-5. Check node status
+5. Inspect status
 
 ```bash
 go run ./cmd/client --addr 127.0.0.1:9001 --command status
 ```
 
-## Recommended Development Order
+## Protocol Split
 
-1. Complete `api/proto/raft.proto`
-2. Decouple control plane from inter-node transport
-3. Implement `internal/transport/tcp` and `internal/transport/quic`
-4. Implement minimal leader election and log replication in `internal/raft`
-5. Add baseline test scenarios in `cmd/bench`
+- `client -> node`: HTTP over TCP
+- `node -> node`: configurable `TCP` or `QUIC`
+
+That split keeps the experiment focused on the transport used by replication traffic, instead of mixing client protocol changes into the result.
 
 ## Documentation
 

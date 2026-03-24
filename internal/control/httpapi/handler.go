@@ -16,6 +16,7 @@ type proposalRequest struct {
 type proposalResponse struct {
 	OK      bool   `json:"ok"`
 	Message string `json:"message,omitempty"`
+	Leader  string `json:"leader,omitempty"`
 }
 
 type getResponse struct {
@@ -114,11 +115,17 @@ func handlePost(w http.ResponseWriter, r *http.Request, node *raft.Node) {
 		return
 	}
 
-	if err := node.Propose(req.Key, req.Value); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, proposalResponse{
+	if err := node.Propose(r.Context(), req.Key, req.Value); err != nil {
+		statusCode := http.StatusServiceUnavailable
+		response := proposalResponse{
 			OK:      false,
 			Message: err.Error(),
-		})
+			Leader:  node.LeaderID(),
+		}
+		if !node.IsLeader() {
+			statusCode = http.StatusConflict
+		}
+		writeJSON(w, statusCode, response)
 		return
 	}
 

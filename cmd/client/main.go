@@ -9,12 +9,17 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type proposalRequest struct {
 	Command string `json:"command"`
 	Key     string `json:"key"`
 	Value   string `json:"value"`
+}
+
+var httpClient = &http.Client{
+	Timeout: 3 * time.Second,
 }
 
 func main() {
@@ -66,7 +71,7 @@ func put(baseURL, key, value string) error {
 		return err
 	}
 
-	resp, err := http.Post(baseURL+"/kv", "application/json", bytes.NewReader(body))
+	resp, err := doWithRetry(http.MethodPost, baseURL+"/kv", bytes.NewReader(body), "application/json")
 	if err != nil {
 		return err
 	}
@@ -76,7 +81,7 @@ func put(baseURL, key, value string) error {
 }
 
 func get(baseURL, key string) error {
-	resp, err := http.Get(baseURL + "/kv?key=" + key)
+	resp, err := doWithRetry(http.MethodGet, baseURL+"/kv?key="+key, nil, "")
 	if err != nil {
 		return err
 	}
@@ -86,7 +91,7 @@ func get(baseURL, key string) error {
 }
 
 func status(baseURL string) error {
-	resp, err := http.Get(baseURL + "/status")
+	resp, err := doWithRetry(http.MethodGet, baseURL+"/status", nil, "")
 	if err != nil {
 		return err
 	}
@@ -104,4 +109,40 @@ func printResponse(resp *http.Response) error {
 	fmt.Printf("status=%d\n", resp.StatusCode)
 	fmt.Print(string(body))
 	return nil
+}
+
+func doWithRetry(method, url string, body io.Reader, contentType string) (*http.Response, error) {
+	var bodyBytes []byte
+	var err error
+	if body != nil {
+		bodyBytes, err = io.ReadAll(body)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var response *http.Response
+	for attempt := 0; attempt < 5; attempt++ {
+		var requestBody io.Reader
+		if bodyBytes != nil {
+			requestBody = bytes.NewReader(bodyBytes)
+		}
+
+		req, err := http.NewRequest(method, url, requestBody)
+		if err != nil {
+			return nil, err
+		}
+		if contentType != "" {
+			req.Header.Set("Content-Type", contentType)
+		}
+
+		response, err = httpClient.Do(req)
+		if err == nil {
+			return response, nil
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	return nil, err
 }

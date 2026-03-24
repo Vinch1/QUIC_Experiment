@@ -1,6 +1,6 @@
 # 环境搭建
 
-本文档用于搭建 `quic-raft` 的本地实验环境，目标是先跑通最小 3 节点实验，再逐步引入 QUIC、故障注入和性能观测。
+本文档用于搭建 `quic-raft` 的本地实验环境，目标是先跑通最小 3 节点复制实验，再逐步引入真正的 Raft 选主、弱网注入和性能观测。
 
 ## 1. 当前环境检查结果
 
@@ -68,11 +68,21 @@ make test
 make build
 ```
 
-运行一个本地节点：
+运行一个单节点：
 
 ```bash
 make run-node
 ```
+
+启动一个 3 节点 TCP 集群：
+
+```bash
+go run ./cmd/node --id node-1 --control-addr 127.0.0.1:9001 --raft-addr 127.0.0.1:7001 --transport tcp --leader --peers node-2=127.0.0.1:7002,node-3=127.0.0.1:7003
+go run ./cmd/node --id node-2 --control-addr 127.0.0.1:9002 --raft-addr 127.0.0.1:7002 --transport tcp --leader-id node-1 --peers node-1=127.0.0.1:7001,node-3=127.0.0.1:7003
+go run ./cmd/node --id node-3 --control-addr 127.0.0.1:9003 --raft-addr 127.0.0.1:7003 --transport tcp --leader-id node-1 --peers node-1=127.0.0.1:7001,node-2=127.0.0.1:7002
+```
+
+切换到 QUIC 只需要把 `--transport tcp` 改成 `--transport quic`。
 
 在另一个终端写入测试数据：
 
@@ -95,7 +105,7 @@ go run ./cmd/client --addr 127.0.0.1:9001 --command status
 ## 5. 目录用途
 
 - `cmd/node`：Raft 节点服务入口
-- `cmd/client`：客户端占位入口
+- `cmd/client`：控制面客户端
 - `cmd/bench`：实验驱动入口
 - `internal/raft`：Raft 核心状态与配置
 - `internal/transport`：TCP / QUIC 传输抽象
@@ -105,6 +115,12 @@ go run ./cmd/client --addr 127.0.0.1:9001 --command status
 ## 6. 建议的下一步安装顺序
 
 第一优先级：
+
+1. `quic-go` 依赖可正常下载
+2. 3 节点 TCP 集群可互联
+3. 3 节点 QUIC 集群可互联
+
+第二优先级：
 
 1. Prometheus
 2. Grafana
@@ -118,4 +134,5 @@ go run ./cmd/client --addr 127.0.0.1:9001 --command status
 - `make test` 成功
 - `make build` 成功
 - `make run-node` 能启动单节点
-- 后续补全 `docker compose up` 时，能够同时启动 3 个节点
+- 3 个节点能通过 TCP 完成多数派写入
+- 3 个节点能通过 QUIC 完成多数派写入

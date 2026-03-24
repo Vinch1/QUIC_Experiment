@@ -8,19 +8,44 @@ import (
 	"testing"
 
 	"github.com/leo/quic-raft/internal/raft"
+	roottransport "github.com/leo/quic-raft/internal/transport"
 )
 
+type fakeTransport struct{}
+
+func (fakeTransport) Start(context.Context, roottransport.HandlerFunc) error {
+	return nil
+}
+
+func (fakeTransport) Stop(context.Context) error {
+	return nil
+}
+
+func (fakeTransport) Send(context.Context, string, roottransport.Request) (roottransport.Response, error) {
+	return roottransport.Response{OK: true}, nil
+}
+
+func (fakeTransport) Addr() string {
+	return "in-memory"
+}
+
+func (fakeTransport) Kind() roottransport.Kind {
+	return roottransport.KindTCP
+}
+
 func TestHandlerPutThenGet(t *testing.T) {
-	node, err := raft.NewNode(raft.Config{
-		NodeID:        "node-1",
-		ListenAddr:    "127.0.0.1:9001",
-		TransportKind: "tcp",
-	})
+	node, err := raft.NewNodeWithTransport(raft.Config{
+		NodeID:          "node-1",
+		ControlAddr:     "127.0.0.1:9001",
+		RaftAddr:        "127.0.0.1:7001",
+		TransportKind:   "tcp",
+		BootstrapLeader: true,
+	}, fakeTransport{})
 	if err != nil {
 		t.Fatalf("new node: %v", err)
 	}
 
-	if err := node.Start(context.Background()); err != nil {
+	if err := node.Start(t.Context()); err != nil {
 		t.Fatalf("start node: %v", err)
 	}
 
